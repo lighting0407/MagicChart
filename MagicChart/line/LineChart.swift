@@ -28,6 +28,7 @@ open class LineChart: AxisChart {
     public var selectedLayer: CAShapeLayer?
     public var selectedLineWidth: CGFloat = 0.8
     public var selectedLineColor: UIColor = .purple
+    public var isDrawInvalidatePoint: Bool = true
     
     public var delegate: LineChartDelegate?
     
@@ -155,6 +156,11 @@ open class LineChart: AxisChart {
                         var y = (1 - ((v - minimum) / (maximum - minimum))) * setHeight
                         y = axisConfig.reverse ? setHeight - y : y
                         
+                        //if value in Y axis is lower than minimum, don't draw this point
+                        if(!isDrawInvalidatePoint && v < minimum){
+                           points.append(nil)
+                           continue
+                        }
                         // TODO: fix line overflow with more clever mothod
                         if y == 0 {
                             y = Double(set.lineWidth) / 2
