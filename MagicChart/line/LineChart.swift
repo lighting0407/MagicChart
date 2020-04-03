@@ -19,6 +19,8 @@ open class LineChart: AxisChart {
     
     public var dataSetLayer: [(set: CAShapeLayer, line: CAShapeLayer, area: CALayer?, mask: CAShapeLayer?)] = []
     public var dataPointLayer: [(layer: CAShapeLayer, subs: [LineChartPoint])?] = []
+    public var dataSegmentLayer: [CAShapeLayer] = []
+    public var dataSegmentTextLayer: [CATextLayer] = []
     public var dataPoints: [[CGPoint?]] = []
     private var dataPointsCache: [[CGPoint]] = []
     
@@ -83,6 +85,8 @@ open class LineChart: AxisChart {
         axis.y.left.frame = CGRect(x: 0, y: 0, width: yLeftAxisWidth, height: dataLayer!.frame.height)
         axis.y.right.frame = CGRect(x: chartLayer!.frame.width - insetRight, y: 0, width: yRightAxisWidth, height: dataLayer!.frame.height)
         
+        drawSegment()
+        
         drawAxisLine()
         
         chartLayer?.addSublayer(dataLayer!)
@@ -120,6 +124,9 @@ open class LineChart: AxisChart {
             }
         }
         
+        _ = dataSegmentLayer.map({$0.removeFromSuperlayer()})
+        _ = dataSegmentTextLayer.map({$0.removeFromSuperlayer()})
+                
         dataPoints.removeAll()
         dataPointsCache.removeAll()
         dataSetLayer.removeAll()
@@ -182,9 +189,13 @@ open class LineChart: AxisChart {
             var lastIndex: Int = 0
             
             for (i, p) in points.enumerated() {
+//                if (p == nil) {
+//                   lastPoint = p
+//               }
                 guard let p = p else {
                     continue
                 }
+       
                 
                 if lastPoint == nil || (!set.continuous && lastIndex < i - 1) {
                     lastPoint = p
@@ -354,6 +365,82 @@ open class LineChart: AxisChart {
         )
         
         return (a, b)
+    }
+    
+    func drawSegment(){
+        func drawSegmentTitle(textFrame: CGRect, text: String) -> CATextLayer{
+            //文字使用暂时使用横轴的配置axis.x
+            let textLayer = CATextLayer()
+            textLayer.frame = textFrame
+
+            textLayer.font = axis.x.labelFont
+            textLayer.fontSize = axis.x.labelFont.pointSize
+            textLayer.foregroundColor = axis.x.labelColor.cgColor
+            textLayer.string = text
+            textLayer.alignmentMode = CATextLayerAlignmentMode(rawValue: "center")
+            textLayer.contentsScale = UIScreen.main.scale
+            return textLayer
+        }
+        let labels = self.dataSource.label
+        let segmentTitles = self.dataSource.segment.segmentTitle
+        let segments = self.dataSource.segment.segments
+        if segments.count > 0 {
+//            var startSegment = -1, endSegment = -1
+            var prefixArea: CGRect = CGRect.zero, suffixArea = CGRect.zero
+            
+            for (index, item) in segments.enumerated(){
+                if let start = labels.firstIndex(of: item.label.start), let end = labels.firstIndex(of: item.label.end){
+                    let itemWidth: CGFloat = self.axis.x.frame.size.width / CGFloat(max(1, labels.count - 1))
+                    let startX = itemWidth * CGFloat(start) + axis.x.frame.origin.x
+                    let segmentW = itemWidth * CGFloat(max(0, end - start))
+                    
+                    let segmentFrame = CGRect(x: startX , y: axis.y.left.frame.origin.y, width: segmentW, height: axis.y.left.frame.size.height)
+                    
+                    let layer = CAShapeLayer()
+                    layer.frame = segmentFrame
+                    layer.backgroundColor = item.color.cgColor
+                    layer.opacity = Float(item.opacity)
+                    chartLayer?.addSublayer(layer)
+                    dataSegmentLayer.append(layer)
+                    if(index == 0){
+                        prefixArea = CGRect(x: axis.x.frame.origin.x , y: axis.y.left.frame.origin.y, width: startX, height: axis.y.left.frame.size.height)
+                        if(segmentTitles.count == segments.count + 2){
+                            var textFrame = prefixArea
+                            textFrame.size.height = axis.x.labelFont.pointSize + 4
+                            if let text = segmentTitles.first{
+                                let textLayer = drawSegmentTitle(textFrame: textFrame, text: text)
+                                chartLayer?.addSublayer(textLayer)
+                                dataSegmentTextLayer.append(textLayer)
+                            }
+                        }
+                    }
+                    if (index == segments.count - 1){
+                        let sx: CGFloat = segmentFrame.origin.x + segmentFrame.size.width
+                        let sxW: CGFloat = sx - axis.x.frame.origin.x
+                        suffixArea = CGRect(x: sx, y: axis.y.left.frame.origin.y, width: axis.x.frame.width - sxW, height: axis.y.left.frame.size.height)
+                        if(segmentTitles.count == segments.count + 2){
+                            var textFrame = suffixArea
+                            textFrame.size.height = axis.x.labelFont.pointSize + 4
+                            if let text = segmentTitles.last{
+                                let textLayer = drawSegmentTitle(textFrame: textFrame, text: text)
+                                chartLayer?.addSublayer(textLayer)
+                                dataSegmentTextLayer.append(textLayer)
+                            }
+                        }
+                    }
+                    
+                    //文字使用暂时使用横轴的配置axis.x
+                    if(segmentTitles.count == segments.count + 2){
+                        var textFrame = segmentFrame
+                        textFrame.size.height = axis.x.labelFont.pointSize + 4
+                        let text = segmentTitles[index + 1]
+                        let textLayer = drawSegmentTitle(textFrame: textFrame, text: text)
+                        chartLayer?.addSublayer(textLayer)
+                        dataSegmentTextLayer.append(textLayer)
+                    }
+                }
+            }
+        }
     }
     
     func drawAxisLine() {
@@ -617,6 +704,12 @@ extension LineChart {
         }
         
         return sets
+    }
+    
+    public func createSegmentData( segmentPoint: (start: String, end: String), color: UIColor, segmentTitles: [String], opacity: CGFloat = 1 ) -> LineChartSegmentSet{
+        let segItem = LineCharSegmentItem(start: segmentPoint.start, end: segmentPoint.end)
+        let segment : LineChartSegmentSet = LineChartSegmentSet(segments: [(label: segItem, color: color, opacity : opacity)], segmentTitle: segmentTitles)
+        return segment
     }
 }
 
