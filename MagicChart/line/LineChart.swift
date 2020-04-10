@@ -403,7 +403,7 @@ open class LineChart: AxisChart {
                     chartLayer?.addSublayer(layer)
                     dataSegmentLayer.append(layer)
                     if(index == 0){
-                        prefixArea = CGRect(x: axis.x.frame.origin.x , y: axis.y.left.frame.origin.y, width: startX, height: axis.y.left.frame.size.height)
+                        prefixArea = CGRect(x: axis.x.frame.origin.x , y: axis.y.left.frame.origin.y+4, width: startX, height: axis.y.left.frame.size.height)
                         if(segmentTitles.count == segments.count + 2){
                             var textFrame = prefixArea
                             textFrame.size.height = axis.x.labelFont.pointSize + 4
@@ -417,7 +417,7 @@ open class LineChart: AxisChart {
                     if (index == segments.count - 1){
                         let sx: CGFloat = segmentFrame.origin.x + segmentFrame.size.width
                         let sxW: CGFloat = sx - axis.x.frame.origin.x
-                        suffixArea = CGRect(x: sx, y: axis.y.left.frame.origin.y, width: axis.x.frame.width - sxW, height: axis.y.left.frame.size.height)
+                        suffixArea = CGRect(x: sx, y: axis.y.left.frame.origin.y+4, width: axis.x.frame.width - sxW, height: axis.y.left.frame.size.height)
                         if(segmentTitles.count == segments.count + 2){
                             var textFrame = suffixArea
                             textFrame.size.height = axis.x.labelFont.pointSize + 4
@@ -432,6 +432,7 @@ open class LineChart: AxisChart {
                     //文字使用暂时使用横轴的配置axis.x
                     if(segmentTitles.count == segments.count + 2){
                         var textFrame = segmentFrame
+                        textFrame.origin.y = segmentFrame.origin.y + 4
                         textFrame.size.height = axis.x.labelFont.pointSize + 4
                         let text = segmentTitles[index + 1]
                         let textLayer = drawSegmentTitle(textFrame: textFrame, text: text)
@@ -443,12 +444,53 @@ open class LineChart: AxisChart {
         }
     }
     
+    func selectxAxisLabelWithSegement() -> [String]{
+        let segments = self.dataSource.segment.segments
+        var indexList = [Int]()
+        if dataSource.label.count > 0{
+            indexList.append(0)
+        }
+        for (_, item) in segments.enumerated(){
+            let start = item.label.start
+            let end = item.label.end
+            if let startIndex = dataSource.label.index(of: start){
+                if !indexList.contains(startIndex){
+                    indexList.append(startIndex)
+                }
+            }
+            if let endIndex = dataSource.label.index(of: end){
+                if !indexList.contains(endIndex){
+                    indexList.append(endIndex)
+                }
+            }
+        }
+        if dataSource.label.count > 0 && !indexList.contains(dataSource.label.count-1){
+            indexList.append(dataSource.label.count-1)
+        }
+        var result = [String]()
+        for i in 0..<dataSource.label.count {
+            if indexList.contains(i) {
+                result.append(dataSource.label[i])
+            } else {
+                result.append("")
+            }
+        }
+        return result
+    }
+    
     func drawAxisLine() {
         let xAxis = ChartXAxisLayer()
         xAxis.config = axis.x
         axis.x.labelInset = dataLayerInset
         xAxis.frame = axis.x.frame
-        xAxis.labels = ChartUtils.selectStrings(source: dataSource.label, count: axis.x.labelCount, force: false)
+        
+        let segments = self.dataSource.segment.segments
+        //若有分段，则横坐标显示起点，终点，和分段点
+        if segments.count > 0{
+            xAxis.labels = selectxAxisLabelWithSegement()
+        }else{
+            xAxis.labels = ChartUtils.selectStrings(source: dataSource.label, count: axis.x.labelCount,     force: false)
+        }
         
         let yLeftAxis = ChartYAxisLayer()
         yLeftAxis.config = axis.y.left
